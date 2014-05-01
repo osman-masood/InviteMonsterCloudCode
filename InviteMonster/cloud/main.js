@@ -55,14 +55,14 @@ Parse.Cloud.afterSave(Parse.User, function(request) {
 
     // Send an SMS message
     client.sendSms({
-            to: '+14085152051',
-            from: '+14085152051',
-            body: 'Your friend Osman just invited you to go bumpin\'! Get InviteMonster to respond.'
+            to: request.object.get("phoneNumber"),
+            from: '+19257054413',
+            body: 'Your friend Osman just invited you to go bumpin\'! Get InviteMonster to go bumpin\' with Osman.'
         },
         function(err, responseData) {
             if (err) {
-                console.log("Error happened when sending text message to user ", request.object.get("phoneNumber"));
-                console.log(err);
+                console.error("Error happened when sending text message to user ", request.object.get("phoneNumber"));
+                console.error(err);
             } else {
                 console.log(responseData.from);
                 console.log(responseData.body);
