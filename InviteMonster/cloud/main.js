@@ -1,72 +1,73 @@
-// 
-// // Use Parse.Cloud.define to define as many cloud functions as you want.
-// // For example:
-// Parse.Cloud.define("invite", function(request, response) {
-//  var phoneNumber = request.params.phoneNumber;
-//  response.success(phoneNumber);
-//  
-//  
-//  var query = new Parse.Query("User");
-//  query.equalTo("phoneNumber", phoneNumber);
-//  query.find({
-//      success: function(results) {
-//          var user = results[0];
-//          response.success("User found: " + user.get("phoneNumber"));
-//      },
-//      error: function() {
-//          response.error("User lookup failed");
-//      }
-//  });
-// });
-
 var twilioAccountSid = 'AC50d3202d08057a85736be77107e7c453';
 var twilioAuthToken = '5c3603a3a2766b24e43159e27cd0eea9';
 
+//4-digit number btwn 1000 and 9999
+function generateInviteCode() {
+    return Math.floor(Math.random() * 9000) + 1000;
+}
+
+function checkDuplicatesAndErrorIfFound(request, response, fieldName, successCallback) {
+    if (request.object.get(fieldName)) {
+        console.info("Checking for duplicate " + fieldName);
+        var query = new Parse.Query(Parse.User);
+        query.equalTo(fieldName, request.object.get(fieldName));
+        query.find({
+            success: function(results) {
+                if (results.length > 0) {
+                    response.error("User's " + fieldName + " " + request.object.get(fieldName) + " already exists in database");
+                }
+                successCallback();
+            },
+            error: function() {
+                response.error("Unable to lookup user to check for duplicates of " + request.object.get(fieldName));
+            }
+        });
+    } else {
+        successCallback();
+    }
+}
+
 Parse.Cloud.beforeSave(Parse.User, function(request, response) {
-//  query = new Parse.Query("User");
-//  var inviteCode = request.object.get("inviteCode");
-    console.log("Entering beforeSave! " + request.object);
+    console.log("BeforeSave call");
 
-    // Set the user's invite code to random 4-digit number
-    var inviteCode = Math.floor((Math.random() * 10000));
-    request.object.set("inviteCode", inviteCode);
+    // Either email or phone is required
+    if (!request.object.get("phoneNumber") && !request.object.get("email")) {
+        response.error("Missing phone number or email");
+    }
 
-    console.log("Before success!");
-    response.success();
-    console.log("After success!");
-//  var query = new Parse.Query("User");
-//  query.equalTo("phoneNumber", phoneNumber);
-//  query.find({
-//      success: function(results) {
-//          var user = results[0];
-//          response.success("User found: " + user.get("phoneNumber"));
-//      },
-//      error: function() {
-//          response.error("User lookup failed");
-//      }
-//  });
+    // If any user has the same phone number or email address, return an error
+    console.log("Checking to see if any user has same phone number or email address");
+    checkDuplicatesAndErrorIfFound(request, response, "phoneNumber", function() {
+        checkDuplicatesAndErrorIfFound(request, response, "email", function() {
+            // Set the user's invite code
+            request.object.set("inviteCode", generateInviteCode());
+            response.success();
+        });
+    });
 });
 
 Parse.Cloud.afterSave(Parse.User, function(request) {
-    // Text the user the invite code
     // Require and initialize the Twilio module with your credentials
+    var twilioClient = require('twilio')(twilioAccountSid, twilioAuthToken);
 
-    var client = require('twilio')(twilioAccountSid, twilioAuthToken);
-
-    // Send an SMS message
-    client.sendSms({
-            to: request.object.get("phoneNumber"),
-            from: '+19257054413',
-            body: 'Your friend Osman just invited you to go bumpin\'! Get InviteMonster to go bumpin\' with Osman.'
-        },
-        function(err, responseData) {
-            if (err) {
-                console.error("Error happened when sending text message to user ", request.object.get("phoneNumber"));
-                console.error(err);
-            } else {
-                console.log(responseData.from);
-                console.log(responseData.body);
+    // Send an SMS message with the invite code
+    if (request.object.get("phoneNumber")) {
+        twilioClient.sendSms({
+                to: request.object.get("phoneNumber"),
+                from: '+19257054413',
+                body: 'Your friend Osman just invited you to go bumpin\'! Get InviteMonster (invite code ' + request.object.get("inviteCode") + ') to go bumpin\' with Osman.'
+            },
+            function(err, responseData) {
+                if (err) {
+                    console.error("Error happened when sending text message to user " + request.object.get("phoneNumber"));
+                    console.error(err);
+                } else {
+                    console.log(responseData.from);
+                    console.log(responseData.body);
+                }
             }
-        }
-    );
+        );
+    } else {
+        console.error("User " + request.object.id + " did not have phoneNumber, so did not send text");
+    }
 });
