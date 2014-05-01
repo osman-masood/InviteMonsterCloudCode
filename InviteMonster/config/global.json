@@ -1,0 +1,11 @@
+{
+    "applications": {
+        "InviteMonster": {
+            "applicationId": "qb9AlvfEwVJkZSVCfXOKmxOytM4mHjP8qiuTgamD", 
+            "masterKey": "7rZc3iUcmINzjAJgAGmcO1LG7pBsXCjfWmwKL0nf"
+        }, 
+        "_default": {
+            "link": "InviteMonster"
+        }
+    }
+}
