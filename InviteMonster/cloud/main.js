@@ -8,7 +8,7 @@ function generateInviteCode() {
 
 function checkDuplicatesAndErrorIfFound(request, response, fieldName, successCallback) {
     if (request.object.get(fieldName)) {
-        console.info("Checking for duplicate " + fieldName);
+        console.log("Checking for duplicate " + fieldName);
         var query = new Parse.Query(Parse.User);
         query.equalTo(fieldName, request.object.get(fieldName));
         query.find({
