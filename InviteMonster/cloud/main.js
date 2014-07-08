@@ -208,10 +208,7 @@ Parse.Cloud.define("addGroupMember", function(request, response)
     "use strict";
     var creatingUser = request.user;
     var groupId = request.params.groupId;  // string required
-//    phoneNumber = phoneNumber.replace(/[^0-9]/g, "");  // remove all non-numeric phone digits
-//    console.log("inviteUser: cleaned phoneNumber: " + phoneNumber);
-//    var eventTitle = request.params.eventTitle;
     var phoneNumber = request.params.groupMemberPhone;
     var invitejsFile = require("cloud/invite.js");
-    invitejsFile.inviteUser(creatingUser, phoneNumber, null, response);
+    invitejsFile.inviteUser(creatingUser, phoneNumber, groupId, response);
 });
