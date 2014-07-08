@@ -1,27 +1,179 @@
 /*
  Based on: https://gist.github.com/mikevansnell/5140654
- but invites based on phone number (by sending text) rather than email
- */
+ but invites based on phone number (by sending text) rather than email.
 
+ If user already exists, text them their invite code. If not, create & then text.
+ (However, if eventTitle is not provided, it does not text the user.)
+ */
 exports.inviteUser = function(creatingUser, phoneNumber, eventTitle, response)
 {
     "use strict";
-    var inviteCode = generateInviteCodeString();
-    var user = new Parse.User();
-    user.set("username", phoneNumber);
-    user.set("phoneNumber", phoneNumber);
-    user.set("password", inviteCode);
-    user.signUp(null, {
-        success: function(createdUser) {
+
+    getOrSignUpUser(phoneNumber, function(invitedUser, inviteCode) {
+
+        // TODO do things here based on timesInvited and eventTitle. also figure out how to get invite code to send to user if user already exists
+
+        if (eventTitle)  // event title provided - text the user the event info & invite code
+        {
             textUserInviteCodeForEvent(phoneNumber, creatingUser.get("firstName"), eventTitle, inviteCode, {
                 success: function() {
-                    response.success(createdUser);
+                    var timesInvited = invitedUser.get("timesInvited") || 0;
+                    timesInvited += 1;
+                    invitedUser.set("timesInvited", timesInvited);
+                    invitedUser.save().then(
+                        function(invitedUserAgain) {
+                            response.success(invitedUser);
+                        },
+                        function(error) {
+                            console.error("Failed to update timesInvited: " + error);
+                            response.error("Failed to update timesInvited: " + error);
+                        }
+                    );
                 },
                 error: function(err) {
                     console.error("User " + createdUser.id + " created, but couldn't text them: " + err);
                     response.error("User " + createdUser.id + " created, but couldn't text them: " + err);
                 }
             });
+        }
+
+
+    }, response);
+
+//    // Get the user based on phoneNumber
+//    var userQuery = new Parse.Query(Parse.User);
+//    userQuery.equalTo("phoneNumber", phoneNumber);
+//    userQuery.first({
+//        success: function(invitedUser) {
+//            if (invitedUser)  // user exists
+//            {
+//                if (eventTitle)  // event title provided - text the user the event info & invite code
+//                {
+//                    textUserInviteCodeForEvent(phoneNumber, creatingUser.get("firstName"), eventTitle, inviteCode, {
+//                        success: function() {
+//                            var timesInvited = invitedUser.get("timesInvited") || 0;
+//                            timesInvited += 1;
+//                            user.set("timesInvited", timesInvited);
+//                            user.save();
+//                            response.success(createdUser);
+//                        },
+//                        error: function(err) {
+//                            console.error("User " + createdUser.id + " created, but couldn't text them: " + err);
+//                            response.error("User " + createdUser.id + " created, but couldn't text them: " + err);
+//                        }
+//                    });
+//                }
+//                else  // no event title provided - just return the user
+//                {
+//                    response.success(invitedUser);
+//                }
+//            }
+//            else  // user doesn't exist - create the user and invite if eventTitle is provided
+//            {
+//                signUpAndInviteUser(phoneNumber, eventTitle, response);
+//            }
+//        },
+//        error: function(err) {
+//            console.error("Received error querying user to see if it exists: " + err);
+//            response.error("Received error querying user to see if it exists: " + err)
+//        }
+//    });
+};
+
+
+
+
+function getOrSignUpUser(phoneNumber, successCallbackWithUserAndInviteCode, response)
+{
+    var userQuery = new Parse.Query(Parse.User);
+    userQuery.equalTo("phoneNumber", phoneNumber);
+    userQuery.first({
+        success: function(queriedUser) {
+            if (queriedUser)  // user exists
+            {
+                successCallbackWithUserAndInviteCode(queriedUser, queriedUser.get("inviteCode"));
+            }
+            else  // user doesn't exist
+            {
+                signUpUser(phoneNumber, function(createdUser, inviteCode) {
+                    successCallbackWithUserAndInviteCode(createdUser, inviteCode);
+                }, response);
+            }
+        },
+        error: function(err) {
+            console.error("Received error querying user to see if it exists: " + err);
+            response.error("Received error querying user to see if it exists: " + err)
+        }
+    });
+}
+
+
+function signUpUser(phoneNumber, successCallback, response) {
+    "use strict";
+
+    var inviteCode = generateInviteCodeString();
+    var user = new Parse.User();
+    user.set("username", phoneNumber);
+    user.set("phoneNumber", phoneNumber);
+    user.set("password", inviteCode);
+    user.set("inviteCode", inviteCode);
+    user.set("timesInvited", 0);
+    user.signUp(null, {
+        success: function(createdUser)
+        {
+            successCallback(createdUser, inviteCode);
+//            sendInvitationEmail(email, subject, tempPass, {
+//                success: function(httpResponse) {
+//                    console.log("User " + createdUser.id + " created, and sent email: " + httpResponse.status);
+//                    response.success(createdUser);
+//                },
+//                error: function (httpResponse) {
+//                    console.error("user " + createdUser.id +" created, but couldn't email them. " + httpResponse.status + " " + httpResponse.text);
+//                    response.error("user " + createdUser.id +" created, but couldn't email them. " + httpResponse.status);
+//                }
+//            });
+        },
+        error: function(user, error)
+        {
+            console.error("signUpUser error: couldn't create user " + error.code + " " + error.message);
+            response.error("signUpUser error: couldn't create user " + error.code + " " + error.message);
+        }
+    });
+}
+
+
+function signUpAndInviteUser(phoneNumber, eventTitle, response) {
+    "use strict";
+
+    var inviteCode = generateInviteCodeString();
+    var user = new Parse.User();
+    user.set("username", phoneNumber);
+    user.set("phoneNumber", phoneNumber);
+    user.set("password", inviteCode);
+    user.set("timesInvited", 0);
+    user.signUp(null, {
+        success: function(createdUser)
+        {
+            if (eventTitle)  // event title provided - text the user the event info & invite code
+            {
+                textUserInviteCodeForEvent(phoneNumber, creatingUser.get("firstName"), eventTitle, inviteCode, {
+                    success: function()
+                    {
+                        user.set("timesInvited", 1);
+                        user.save();
+                        response.success(createdUser);
+                    },
+                    error: function(err)
+                    {
+                        console.error("User " + createdUser.id + " created, but couldn't text them: " + err);
+                        response.error("User " + createdUser.id + " created, but couldn't text them: " + err);
+                    }
+                });
+            }
+            else  // no event title provided - just create the user
+            {
+                response.success(createdUser);
+            }
 
 //            sendInvitationEmail(email, subject, tempPass, {
 //                success: function(httpResponse) {
@@ -34,11 +186,13 @@ exports.inviteUser = function(creatingUser, phoneNumber, eventTitle, response)
 //                }
 //            });
         },
-        error: function(user,error) {
-            response.error("parse error: couldn't create user " + error.code + " " + error.message);
+        error: function(user,error)
+        {
+            response.error("signUpAndInviteUser error: couldn't create user " + error.code + " " + error.message);
         }
     });
-};
+}
+
 
 //4-digit number btwn 1000 and 9999
 function generateInviteCodeString() {
