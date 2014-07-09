@@ -27,14 +27,14 @@ exports.inviteUser = function(creatingUser, phoneNumber, eventTitle, response)
                             response.success(invitedUser);
                         },
                         function(error) {
-                            console.error("Failed to update timesInvited: " + error);
-                            response.error("Failed to update timesInvited: " + error);
+                            console.error("Failed to update timesInvited: " + error.message);
+                            response.error("Failed to update timesInvited: " + error.message);
                         }
                     );
                 },
                 error: function(err) {
-                    console.error("User " + createdUser.id + " created, but couldn't text them: " + err);
-                    response.error("User " + createdUser.id + " created, but couldn't text them: " + err);
+                    console.error("User " + createdUser.id + " created, but couldn't text them: " + err.message);
+                    response.error("User " + createdUser.id + " created, but couldn't text them: " + err.message);
                 }
             });
         }
@@ -56,29 +56,44 @@ exports.addGroupMember = function(creatingUser, phoneNumber, groupId, response)
         groupMemberQuery.equalTo("group", groupId);
         groupMemberQuery.first({
             success: function(groupMemberObject) {
-                if (groupMemberObject) {  // already exists! do nothings
+                if (groupMemberObject)
+                {  // already exists! do nothings
                     console.log("Group member object already exists: not creating");
                     response.success(groupMemberObject);
-                } else {
+                }
+                else
+                {  // Doesn't exist - create it
                     console.log("Group member of user " + phoneNumber + ", groupId " + groupId + " doesn't exist, so creating");
-                    // Doesn't exist - create it
-                    groupMemberObject = new Parse.Object("GroupMember");
-                    groupMemberObject.set("member", invitedUser.id);
-                    groupMemberObject.set("group", groupId);
-                    groupMemberObject.save(null, {
-                        success: function(savedGroupMemberObject) {
-                            response.success(savedGroupMemberObject);
+
+                    console.log("Fetching group of ID" + groupId);
+                    var groupQuery = new Parse.Query("Group");
+                    groupQuery.get(groupId, {
+                        success: function(groupObject) {
+                            console.log("Successfully retrieved group: " + groupObject.id);
+
+                            groupMemberObject = new Parse.Object("GroupMember");
+                            groupMemberObject.set("member", invitedUser);
+                            groupMemberObject.set("group", groupObject);
+                            groupMemberObject.save(null, {
+                                success: function(savedGroupMemberObject) {
+                                    response.success(savedGroupMemberObject);
+                                },
+                                error: function(unsavedGroupMemberObject, error) {
+                                    console.error("Error saving group member " + phoneNumber + ": [" + error.code + "] " + error.message);
+                                    response.error("Error saving group member " + phoneNumber + ": [" + error.code + "] " + error.message);
+                                }
+                            });
                         },
-                        error: function(unsavedGroupMemberObject, error) {
-                            console.error("Error saving group member " + unsavedGroupMemberObject + ": " + error);
-                            response.error("Error saving group member " + unsavedGroupMemberObject + ": " + error);
+                        error: function(groupObject, error) {
+                            console.error("Error getting group object when adding new group member: " + groupId + " " + error.code + " " + error.message);
+                            response.error("Error getting group object when adding new group member: " + groupId + " " + error.code + " " + error.message);
                         }
                     });
                 }
 
             }, error: function(groupMemberObject, error) {
-                console.error("Failed to get the GroupMember of member=" + invitedUser + ", groupId=" + groupId + ", error=" + error);
-                response.error("Failed to get the GroupMember of member=" + invitedUser + ", groupId=" + groupId + ", error=" + error);
+                console.error("Failed to get the GroupMember of member=" + phoneNumber + ", groupId=" + groupId + ", error=" + error.message);
+                response.error("Failed to get the GroupMember of member=" + phoneNumber + ", groupId=" + groupId + ", error=" + error.message);
             }
         });
 
@@ -106,8 +121,8 @@ function getOrSignUpUser(phoneNumber, successCallbackWithUserAndInviteCode, resp
             }
         },
         error: function(err) {
-            console.error("Received error querying user to see if it exists: " + err);
-            response.error("Received error querying user to see if it exists: " + err)
+            console.error("Received error querying user to see if it exists: " + err.message);
+            response.error("Received error querying user to see if it exists: " + err.message)
         }
     });
 }
