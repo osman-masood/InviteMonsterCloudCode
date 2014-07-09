@@ -191,7 +191,7 @@ Parse.Cloud.define("inviteUser", function(request, response)
     "use strict";
     var creatingUser = request.user;
     var phoneNumber = request.params.phoneNumber;  // string required
-    phoneNumber = phoneNumber.replace(/[^0-9]/g, "");  // remove all non-numeric phone digits
+    phoneNumber = cleanPhoneNumber(phoneNumber);
     console.log("inviteUser: cleaned phoneNumber: " + phoneNumber);
     var eventTitle = request.params.eventTitle;
     var invitejsFile = require("cloud/invite.js");
@@ -209,6 +209,12 @@ Parse.Cloud.define("addGroupMember", function(request, response)
     var creatingUser = request.user;
     var groupId = request.params.groupId;  // string required
     var phoneNumber = request.params.groupMemberPhone;
+    phoneNumber = cleanPhoneNumber(phoneNumber);
     var invitejsFile = require("cloud/invite.js");
-    invitejsFile.inviteUser(creatingUser, phoneNumber, groupId, response);
+    invitejsFile.addGroupMember(creatingUser, phoneNumber, groupId, response);
 });
+
+function cleanPhoneNumber(phoneNumber) {
+    "use strict";
+    return phoneNumber.replace(/[^0-9]/g, "");  // remove all non-numeric phone digits
+}

@@ -51,32 +51,29 @@ exports.addGroupMember = function(creatingUser, phoneNumber, groupId, response)
         // TODO can also verify that creatingUser is creator of groupId
 
         // If group member does not already exist, create it
-        var groupMemberQuery = Parse.Query(Parse.GroupMember);
+        var groupMemberQuery = new Parse.Query("GroupMember");
         groupMemberQuery.equalTo("member", invitedUser.id);
         groupMemberQuery.equalTo("group", groupId);
         groupMemberQuery.first({
             success: function(groupMemberObject) {
-
-                if (groupMemberObject) {  // already exists! do nothing
+                if (groupMemberObject) {  // already exists! do nothings
+                    console.log("Group member object already exists: not creating");
                     response.success(groupMemberObject);
                 } else {
-
+                    console.log("Group member of user " + phoneNumber + ", groupId " + groupId + " doesn't exist, so creating");
                     // Doesn't exist - create it
                     groupMemberObject = new Parse.Object("GroupMember");
-                    groupMemberObject.save({
-                        member: invitedUser.id,
-                        group: groupId
-                    }, {
-                        success: function(obj) {
-                            response.success(obj);
+                    groupMemberObject.set("member", invitedUser.id);
+                    groupMemberObject.set("group", groupId);
+                    groupMemberObject.save(null, {
+                        success: function(savedGroupMemberObject) {
+                            response.success(savedGroupMemberObject);
                         },
-                        error: function(obj, error) {
-                            console.error("Error saving group member " + obj + ": " + error);
-                            response.error("Error saving group member " + obj + ": " + error);
+                        error: function(unsavedGroupMemberObject, error) {
+                            console.error("Error saving group member " + unsavedGroupMemberObject + ": " + error);
+                            response.error("Error saving group member " + unsavedGroupMemberObject + ": " + error);
                         }
                     });
-
-                    response.success(groupMemberObject);
                 }
 
             }, error: function(groupMemberObject, error) {
@@ -97,10 +94,12 @@ function getOrSignUpUser(phoneNumber, successCallbackWithUserAndInviteCode, resp
         success: function(queriedUser) {
             if (queriedUser)  // user exists
             {
+                console.log("getOrSignUpUser: User of phone number " + phoneNumber + " found: " + queriedUser.id);
                 successCallbackWithUserAndInviteCode(queriedUser, queriedUser.get("inviteCode"));
             }
             else  // user doesn't exist
             {
+                console.log("getOrSignUpUser: No user of phone number " + phoneNumber + " found, so signing up new user");
                 signUpUser(phoneNumber, function(createdUser, inviteCode) {
                     successCallbackWithUserAndInviteCode(createdUser, inviteCode);
                 }, response);
